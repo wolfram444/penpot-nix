@@ -1,0 +1,239 @@
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+with lib;
+
+let
+  cfg = config.services.penpot;
+in
+{
+  options.services.penpot = {
+    enable = mkEnableOption "Penpot collaborative design platform";
+
+    port = mkOption {
+      type = types.port;
+      default = 9001;
+      description = "Port for the HTTP proxy frontend (Nginx).";
+    };
+
+    domain = mkOption {
+      type = types.str;
+      default = "localhost";
+      description = "Domain name for Penpot.";
+    };
+
+    openFirewall = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Open ports in the firewall for the Nginx proxy.";
+    };
+
+    backendPort = mkOption {
+      type = types.port;
+      default = 6060;
+      description = "Port to internally run the backend API service on.";
+    };
+
+    exporterPort = mkOption {
+      type = types.port;
+      default = 6061;
+      description = "Port to internally run the exporter service on.";
+    };
+
+    secretKeyFile = mkOption {
+      type = types.path;
+      description = ''
+        Path to a securely provisioned file containing Penpot's PENPOT_SECRET_KEY.
+        It serves as a master key from which other keys for subsystems are derived.
+        Recommended to use a 512-bit base64 encoded string.
+      '';
+    };
+
+    db = {
+      enablePostgres = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable the bundled PostgreSQL database service automatically.";
+      };
+      enableRedis = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable the bundled Redis database service automatically.";
+      };
+      postgresUri = mkOption {
+        type = types.str;
+        default = "postgresql://penpot:penpot@localhost/penpot";
+        description = "PostgreSQL DB URI. Ignored if `enablePostgres` automatically overrides it via default unix sockets.";
+      };
+      redisUri = mkOption {
+        type = types.str;
+        default = "redis://127.0.0.1:6379/0";
+        description = "Redis URI.";
+      };
+    };
+  };
+
+  config = mkIf cfg.enable {
+
+    networking.firewall.allowedTCPPorts = mkIf cfg.openFirewall [ cfg.port ];
+
+    # 1. Provide default configuration for Valkey & Postgres if instructed
+    services.postgresql = mkIf cfg.db.enablePostgres {
+      enable = true;
+      enableTCPIP = true;
+      authentication = pkgs.lib.mkOverride 10 ''
+        #type database  DBuser  auth-method
+        local all       all     trust
+        host  all       all     127.0.0.1/32   trust
+        host  all       all     ::1/128        trust
+      '';
+      ensureDatabases = [ "penpot" ];
+      ensureUsers = [
+        {
+          name = "penpot";
+          ensureDBOwnership = true;
+        }
+      ];
+      # Note: We configure standard Postgres parameters out of the box.
+    };
+
+    services.redis.servers.penpot = mkIf cfg.db.enableRedis {
+      enable = true;
+      port = 6379;
+    };
+
+    # 2. Systemd Backend Daemon
+    systemd.services.penpot-backend = {
+      description = "Penpot Backend API Daemon";
+      after =
+        [ "network.target" ]
+        ++ (if cfg.db.enablePostgres then [ "postgresql.service" ] else [ ])
+        ++ (if cfg.db.enableRedis then [ "redis-penpot.service" ] else [ ]);
+      wantedBy = [ "multi-user.target" ];
+
+      environment = {
+        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies";
+        PENPOT_PUBLIC_URI = "http://${cfg.domain}:${toString cfg.port}";
+        PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
+        PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
+        PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
+
+        PENPOT_DATABASE_URI =
+          if cfg.db.enablePostgres then "postgresql://127.0.0.1:5432/penpot" else cfg.db.postgresUri;
+        PENPOT_DATABASE_USERNAME = "penpot";
+        PENPOT_DATABASE_PASSWORD = "penpot";
+
+        PENPOT_REDIS_URI = cfg.db.redisUri;
+        PENPOT_OBJECTS_STORAGE_BACKEND = "fs";
+        PENPOT_OBJECTS_STORAGE_FS_DIRECTORY = "/var/lib/penpot/assets";
+
+        PENPOT_TELEMETRY_ENABLED = "true";
+        PENPOT_TELEMETRY_REFERER = "nixos-module";
+      };
+
+      serviceConfig = {
+        ExecStart = ''
+          ${pkgs.penpot-backend}/bin/penpot-backend
+        '';
+        EnvironmentFile = [ cfg.secretKeyFile ];
+        User = "penpot";
+        Group = "penpot";
+        StateDirectory = "penpot";
+        WorkingDirectory = "/var/lib/penpot";
+        Restart = "always";
+      };
+    };
+
+    # 3. Systemd Exporter Daemon
+    systemd.services.penpot-exporter = {
+      description = "Penpot Exporter Daemon";
+      after = [
+        "network.target"
+        "penpot-backend.service"
+      ];
+      wantedBy = [ "multi-user.target" ];
+
+      environment = {
+        PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
+        PENPOT_REDIS_URI = cfg.db.redisUri;
+        PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
+      };
+
+      serviceConfig = {
+        ExecStart = ''
+          ${pkgs.penpot-exporter}/bin/penpot-exporter
+        '';
+        EnvironmentFile = [ cfg.secretKeyFile ];
+        User = "penpot";
+        Group = "penpot";
+        Restart = "always";
+      };
+    };
+
+    # Automatically provision the unprivileged Penpot service user
+    users.users.penpot = {
+      isSystemUser = true;
+      group = "penpot";
+      description = "Penpot application user";
+    };
+    users.groups.penpot = { };
+
+    # 4. Expose the static Frontend + API routing strictly through Nginx!
+    services.nginx = {
+      enable = true;
+      virtualHosts."${cfg.domain}" = {
+        listen = [
+          {
+            addr = "0.0.0.0";
+            port = cfg.port;
+          }
+        ];
+
+        locations."/" = {
+          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
+          tryFiles = "$uri /index.html$is_args$args /index.html =404";
+          extraConfig = ''
+            add_header X-Frame-Options SAMEORIGIN always;
+            add_header Cache-Control "no-store, no-cache, max-age=0" always;
+          '';
+        };
+
+        locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
+          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
+          extraConfig = ''
+            add_header Cache-Control "public, max-age=604800" always; # 7 days
+          '';
+        };
+
+        # Proxies
+        locations."/api" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
+          extraConfig = "proxy_buffering off;";
+        };
+
+        locations."/ws/notifications" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
+          proxyWebsockets = true;
+        };
+
+        locations."/assets" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
+        };
+
+        locations."/internal/assets/" = {
+          alias = "/var/lib/penpot/assets/";
+          extraConfig = "internal;";
+        };
+
+        locations."/api/export" = {
+          proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+        };
+      };
+    };
+
+  };
+}
