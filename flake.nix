@@ -34,7 +34,7 @@
             owner = "penpot";
             repo = "penpot";
             rev = "develop";
-            hash = "sha256-JT3JvzM9K+pdoak/T/2yX2WdVHCU/pel/lgFEiqMcbg=";
+            hash = "sha256-AY5Jx93Av/aCRC6F8XmSyVrZD4wIfZgZhW9IiPkaDdo=";
           };
           # Override clojure to use Zulu JDK 25 (matching Penpot's Docker build)
           clojure = pkgs.clojure.override { jdk = pkgs.zulu25; };
