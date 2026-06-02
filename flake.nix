@@ -33,8 +33,8 @@
           penpot-src = pkgs.fetchFromGitHub {
             owner = "penpot";
             repo = "penpot";
-            rev = "develop";
-            hash = "sha256-AY5Jx93Av/aCRC6F8XmSyVrZD4wIfZgZhW9IiPkaDdo=";
+            rev = "2.15.3";
+            hash = "sha256-yMpM0nHfFHVeO6Nw2NC4UAmjj2D6MveiklKtNSz0b2A=";
           };
           # Override clojure to use Zulu JDK 25 (matching Penpot's Docker build)
           clojure = pkgs.clojure.override { jdk = pkgs.zulu25; };
@@ -94,65 +94,43 @@
         };
       nixosModules.penpot = self.nixosModules.default;
 
-      nixosConfigurations.test = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          self.nixosModules.default
-          (
-            { pkgs, ... }:
-            {
-              boot.isContainer = true;
-              fileSystems."/" = {
-                device = "tmpfs";
-                fsType = "tmpfs";
-              };
-              services.penpot.enable = true;
-              services.penpot.openFirewall = true;
-              services.penpot.secretKeyFile = "/tmp/dummy.key";
-              system.stateVersion = "24.05";
-            }
-          )
-        ];
-      };
+      checks = forAllSystems (
+        system: 
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in {
+        test = pkgs.testers.runNixOSTest {
+          name = "config test";
 
-      nixosConfigurations.vm = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          self.nixosModules.default
-          (
-            { pkgs, modulesPath, ... }:
+          nodes.machine =
+            { ... }:
             {
-              imports = [ (modulesPath + "/virtualisation/qemu-vm.nix") ];
-
-              virtualisation.memorySize = 4096;
-              virtualisation.cores = 4;
-              virtualisation.graphics = false;
-              virtualisation.forwardPorts = [
-                {
-                  from = "host";
-                  host.port = 9001;
-                  guest.port = 9001;
-                }
+              imports = with self; [
+                nixosModules.default
+                (
+                  { pkgs, ... }:
+                  {
+                    services.penpot.enable = true;
+                    services.penpot.openFirewall = true;
+                    services.penpot.secretKeyFile = pkgs.writeText "dummy.key" "PENPOT_SECRET_KEY=change-this-insecure-key-for-vm-only";
+                    system.stateVersion = "25.11";
+                  }
+                )
               ];
+            };
 
-              fileSystems."/" = {
-                device = "/dev/disk/by-label/nixos";
-                fsType = "ext4";
-              };
-              boot.loader.grub.device = "/dev/vda";
+          node = {
+            # since we are using an overlay, we must make pkgs writable
+            pkgsReadOnly = false;
+          };
 
-              services.penpot.enable = true;
-              services.penpot.openFirewall = true;
-              # Generate a secure native key specifically for the VM state
-              services.penpot.secretKeyFile = pkgs.writeText "dummy.key" "PENPOT_SECRET_KEY=change-this-insecure-key-for-vm-only";
+          # disable only when working on testScript
+          skipTypeCheck = true;
 
-              # Setup simple root password to debug inside the serial console if necessary
-              users.users.root.password = "nixos";
-              system.stateVersion = "24.05";
-            }
-          )
-        ];
-      };
+          testScript = builtins.readFile ./test.py;
+        };
+
+      });
 
     };
 }

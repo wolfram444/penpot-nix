@@ -13,7 +13,7 @@
 }:
 
 let
-  version = "2.6.0-develop";
+  version = penpot-src.rev;
 in
 stdenv.mkDerivation {
   pname = "penpot-render-wasm";
@@ -75,5 +75,5 @@ stdenv.mkDerivation {
 
   outputHashMode = "recursive";
   outputHashAlgo = "sha256";
-  outputHash = "sha256-0wiZSPJV6tMwTKk74R3enGM8OIpHa2KzCsDubMWd94c=";
+  outputHash = "sha256-HBL1Bf78XnoyXnrWV17pFRfTp2k6VQbWFw4Fmz+zimE=";
 }

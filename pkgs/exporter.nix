@@ -12,7 +12,7 @@
 }:
 
 let
-  version = "2.6.0-develop";
+  version = penpot-src.rev;
 
   # Build the exporter in a Fixed Output Derivation with network access.
   exporter-dist = stdenv.mkDerivation {
@@ -63,7 +63,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-fSCdsqap7uwjg42H1FAUebKS1Smoxjbp/4+LfZZ85vk=";
+    outputHash = "sha256-ftl2nsUsKCp5wUCIYgcuYvqszlnPiRPgiztGBMUdN5M=";
   };
 
 in

@@ -17,7 +17,7 @@
 }:
 
 let
-  version = "2.6.0-develop";
+  version = penpot-src.rev;
 
   # Build the backend jar in a Fixed Output Derivation.
   # This has network access so Aether can resolve the full POM tree.
@@ -64,7 +64,7 @@ let
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
     # First run: use a dummy hash, nix will tell us the real one
-    outputHash = "sha256-CyWPIsGanInStM/XzmtWJgLK2IN0SUIn5HS/bus4dkE=";
+    outputHash = "sha256-Daoot2XCwJ0Vu3GVN2QaVDQ00HUy/3nqNr/CBk8fiFE=";
   };
 
 in

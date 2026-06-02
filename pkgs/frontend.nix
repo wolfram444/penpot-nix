@@ -17,7 +17,7 @@
 }:
 
 let
-  version = "2.6.0-develop";
+  version = penpot-src.rev;
 
   # Build the frontend in a Fixed Output Derivation with network access.
   # The frontend build is complex: pnpm + clojure + cargo/wasm (via emscripten)
@@ -92,7 +92,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    outputHash = "sha256-yy8HXlOUR3/5UCobk0X7K693XkM2VVp67PjNEWXIvhw=";
+    outputHash = "sha256-DDSR047naG1BFm0fs52mMJC8NYQ48KXoPUW0Go3aEKY=";
   };
 
 in
