@@ -64,7 +64,7 @@ let
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
     # First run: use a dummy hash, nix will tell us the real one
-    outputHash = "sha256-NkagE497MhVvACPNbFaBnv+z1onPhxoHMCDrSPIRnGQ=";
+    outputHash = "sha256-CwXj4N6OYSCAhDxziaYdKf209pcL36nttMw+Sas9l90=";
   };
 
 in
