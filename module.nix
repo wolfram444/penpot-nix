@@ -184,6 +184,8 @@ in
     # 4. Expose the static Frontend + API routing strictly through Nginx!
     services.nginx = {
       enable = true;
+      forceSSL = true;
+      enableACME = true;
       virtualHosts."${cfg.domain}" = {
 
         locations."/" = {
