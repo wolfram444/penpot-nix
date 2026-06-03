@@ -184,9 +184,10 @@ in
     # 4. Expose the static Frontend + API routing strictly through Nginx!
     services.nginx = {
       enable = true;
+      virtualHosts."${cfg.domain}" = {
+
       forceSSL = true;
       enableACME = true;
-      virtualHosts."${cfg.domain}" = {
 
         locations."/" = {
           root = "${pkgs.penpot-frontend}/share/penpot/frontend";
