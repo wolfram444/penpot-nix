@@ -22,7 +22,6 @@ in
 
     domain = mkOption {
       type = types.str;
-      default = "localhost";
       description = "Domain name for Penpot.";
     };
 
@@ -117,7 +116,7 @@ in
 
       environment = {
         PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies";
-        PENPOT_PUBLIC_URI = "http://${cfg.domain}:${toString cfg.port}";
+        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
         PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
@@ -186,12 +185,6 @@ in
     services.nginx = {
       enable = true;
       virtualHosts."${cfg.domain}" = {
-        listen = [
-          {
-            addr = "0.0.0.0";
-            port = cfg.port;
-          }
-        ];
 
         locations."/" = {
           root = "${pkgs.penpot-frontend}/share/penpot/frontend";
