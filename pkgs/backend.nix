@@ -15,7 +15,7 @@
   woff2,
   fontforge,
   junixsocket-common,
-  junixsocket-native-common
+  junixsocket-native-common,
 }:
 
 let
@@ -95,11 +95,13 @@ stdenv.mkDerivation {
         ]
       } \
       --chdir "$out/share/penpot/backend" \
-      --add-flags "-cp \"${lib.join ":" [
+      --add-flags "-cp \"${
+        lib.join ":" [
           "$out/share/penpot/backend/penpot.jar"
           "${junixsocket-common}/share/java/*"
           "${junixsocket-native-common}/share/java/*"
-      ]}\"" \
+        ]
+      }\"" \
       --add-flags "-Dim4java.useV7=true" \
       --add-flags "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager" \
       --add-flags "-Dlog4j2.configurationFile=log4j2.xml" \

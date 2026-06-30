@@ -101,21 +101,21 @@ in
     # 2. Systemd Backend Daemon
     systemd.services.penpot-backend = {
       description = "Penpot Backend API Daemon";
-      after =
-        [ "network.target" ]
-        ++ (if cfg.db.enablePostgres then [ "postgresql.service" ] else [ ])
-        ++ (if cfg.db.enableRedis then [ "redis-penpot.service" ] else [ ]);
+      after = [
+        "network.target"
+      ]
+      ++ (if cfg.db.enablePostgres then [ "postgresql.service" ] else [ ])
+      ++ (if cfg.db.enableRedis then [ "redis-penpot.service" ] else [ ]);
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies";
+        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
         PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
 
-        PENPOT_DATABASE_URI =
-          "postgresql://localhost/penpot?socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg&socketFactoryArg=/run/postgresql/.s.PGSQL.${toString config.services.postgresql.port}&sslMode=disable";
+        PENPOT_DATABASE_URI = "postgresql://localhost/penpot?socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg&socketFactoryArg=/run/postgresql/.s.PGSQL.${toString config.services.postgresql.port}&sslMode=disable";
         PENPOT_DATABASE_USERNAME = "penpot";
         PENPOT_DATABASE_PASSWORD = "penpot";
 
@@ -125,6 +125,12 @@ in
 
         PENPOT_TELEMETRY_ENABLED = "true";
         PENPOT_TELEMETRY_REFERER = "nixos-module";
+
+        # Auth
+        PENPOT_OIDC_CLIENT_ID = "pepnpot";
+        PENPOT_OIDC_CLIENT_SECRET = "he8SbNfmnfLNnOY5vNDp1qLXqieSReNe";
+        PENPOT_OIDC_BASE_URI = "https://auth.funksiyachi.uz/realms/TestOpensearch/";
+
       };
 
       serviceConfig = {
@@ -179,8 +185,8 @@ in
       enable = true;
       virtualHosts."${cfg.domain}" = {
 
-      forceSSL = true;
-      enableACME = true;
+        forceSSL = true;
+        enableACME = true;
 
         locations."/" = {
           root = "${pkgs.penpot-frontend}/share/penpot/frontend";

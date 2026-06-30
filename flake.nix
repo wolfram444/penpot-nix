@@ -53,11 +53,9 @@
           # functions from linking with Wasm. Penpot Docker natively uses older 4.0.6 which allowed it.
           # Here we elegantly patch out the assertion to match the behavior of 4.0.6 exactly.
           penpot-emscripten = pkgs.emscripten.overrideAttrs (old: {
-            postPatch =
-              (old.postPatch or "")
-              + ''
-                sed -i 's/assert not metadata.invoke_funcs, "invoke_ functions exported/pass #/g' tools/emscripten.py || true
-              '';
+            postPatch = (old.postPatch or "") + ''
+              sed -i 's/assert not metadata.invoke_funcs, "invoke_ functions exported/pass #/g' tools/emscripten.py || true
+            '';
           });
         in
         rec {
@@ -74,6 +72,26 @@
           default = self.packages.${system}.penpot-frontend; # Or a combined package
         }
       );
+
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = pkgs.mkShell {
+            name = "penpot-flake-dev";
+
+            nativeBuildInputs = with pkgs; [
+              nixfmt
+            ];
+
+          };
+
+        }
+      );
+
+      formatter = forAllSystems (system: (import nixpkgs { inherit system; }).nixfmt);
 
       overlays.default = final: prev: {
         penpot-frontend = self.packages.${prev.system}.penpot-frontend;
@@ -95,42 +113,44 @@
       nixosModules.penpot = self.nixosModules.default;
 
       checks = forAllSystems (
-        system: 
+        system:
         let
           pkgs = import nixpkgs { inherit system; };
-        in {
-        test = pkgs.testers.runNixOSTest {
-          name = "config test";
+        in
+        {
+          test = pkgs.testers.runNixOSTest {
+            name = "config test";
 
-          nodes.machine =
-            { ... }:
-            {
-              imports = with self; [
-                nixosModules.default
-                (
-                  { pkgs, ... }:
-                  {
-                    services.penpot.enable = true;
-                    services.penpot.openFirewall = true;
-                    services.penpot.secretKeyFile = pkgs.writeText "dummy.key" "PENPOT_SECRET_KEY=change-this-insecure-key-for-vm-only";
-                    system.stateVersion = "25.11";
-                  }
-                )
-              ];
+            nodes.machine =
+              { ... }:
+              {
+                imports = with self; [
+                  nixosModules.default
+                  (
+                    { pkgs, ... }:
+                    {
+                      services.penpot.enable = true;
+                      services.penpot.openFirewall = true;
+                      services.penpot.secretKeyFile = pkgs.writeText "dummy.key" "PENPOT_SECRET_KEY=change-this-insecure-key-for-vm-only";
+                      system.stateVersion = "25.11";
+                    }
+                  )
+                ];
+              };
+
+            node = {
+              # since we are using an overlay, we must make pkgs writable
+              pkgsReadOnly = false;
             };
 
-          node = {
-            # since we are using an overlay, we must make pkgs writable
-            pkgsReadOnly = false;
+            # disable only when working on testScript
+            skipTypeCheck = true;
+
+            testScript = builtins.readFile ./test.py;
           };
 
-          # disable only when working on testScript
-          skipTypeCheck = true;
-
-          testScript = builtins.readFile ./test.py;
-        };
-
-      });
+        }
+      );
 
     };
 }
