@@ -83,13 +83,6 @@ in
     # 1. Provide default configuration for Valkey & Postgres if instructed
     services.postgresql = mkIf cfg.db.enablePostgres {
       enable = true;
-      enableTCPIP = true;
-      authentication = pkgs.lib.mkOverride 10 ''
-        #type database  DBuser  auth-method
-        local all       all     trust
-        host  all       all     127.0.0.1/32   trust
-        host  all       all     ::1/128        trust
-      '';
       ensureDatabases = [ "penpot" ];
       ensureUsers = [
         {
@@ -122,7 +115,7 @@ in
         PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
 
         PENPOT_DATABASE_URI =
-          if cfg.db.enablePostgres then "postgresql://127.0.0.1:5432/penpot" else cfg.db.postgresUri;
+          "postgresql://localhost/penpot?socketFactory=org.newsclub.net.unix.AFUNIXSocketFactory$FactoryArg&socketFactoryArg=/run/postgresql/.s.PGSQL.${toString config.services.postgresql.port}&sslMode=disable";
         PENPOT_DATABASE_USERNAME = "penpot";
         PENPOT_DATABASE_PASSWORD = "penpot";
 

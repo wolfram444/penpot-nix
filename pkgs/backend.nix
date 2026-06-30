@@ -14,6 +14,8 @@
   python3,
   woff2,
   fontforge,
+  junixsocket-common,
+  junixsocket-native-common
 }:
 
 let
@@ -63,8 +65,7 @@ let
 
     outputHashMode = "recursive";
     outputHashAlgo = "sha256";
-    # First run: use a dummy hash, nix will tell us the real one
-    outputHash = "sha256-LECtfnUORKHMxLaxT8XLeucDP/bktwYUhu5pkwih6Gc=";
+    outputHash = "sha256-QkN/yQRLKtUfgAW4es66sccJSozrXcbDaivs7Nek8ag=";
   };
 
 in
@@ -94,6 +95,11 @@ stdenv.mkDerivation {
         ]
       } \
       --chdir "$out/share/penpot/backend" \
+      --add-flags "-cp \"${lib.join ":" [
+          "$out/share/penpot/backend/penpot.jar"
+          "${junixsocket-common}/share/java/*"
+          "${junixsocket-native-common}/share/java/*"
+      ]}\"" \
       --add-flags "-Dim4java.useV7=true" \
       --add-flags "-Djava.util.logging.manager=org.apache.logging.log4j.jul.LogManager" \
       --add-flags "-Dlog4j2.configurationFile=log4j2.xml" \
@@ -101,7 +107,7 @@ stdenv.mkDerivation {
       --add-flags "--sun-misc-unsafe-memory-access=allow" \
       --add-flags "--enable-native-access=ALL-UNNAMED" \
       --add-flags "--enable-preview" \
-      --add-flags "-jar $out/share/penpot/backend/penpot.jar" \
+      --add-flags "clojure.main" \
       --add-flags "-m app.main"
   '';
 }
