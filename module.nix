@@ -52,6 +52,15 @@ in
       '';
     };
 
+    
+      type = types.str;
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
+      description = ''
+        PENPOT_FLAGS,
+      '';
+    };
+    
+
     db = {
       enablePostgres = mkOption {
         type = types.bool;
@@ -90,7 +99,6 @@ in
           ensureDBOwnership = true;
         }
       ];
-      # Note: We configure standard Postgres parameters out of the box.
     };
 
     services.redis.servers.penpot = mkIf cfg.db.enableRedis {
@@ -109,7 +117,9 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
+        
+        PENPOT_FLAGS = cfg.flags;
+
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
@@ -130,7 +140,6 @@ in
         PENPOT_OIDC_CLIENT_ID = "pepnpot";
         PENPOT_OIDC_CLIENT_SECRET = "he8SbNfmnfLNnOY5vNDp1qLXqieSReNe";
         PENPOT_OIDC_BASE_URI = "https://auth.funksiyachi.uz/realms/TestOpensearch/";
-
       };
 
       serviceConfig = {
@@ -172,7 +181,35 @@ in
       };
     };
 
-    # Automatically provision the unprivileged Penpot service user
+   
+    systemd.services.penpot-frontend-config = {
+      description = "Generate Penpot frontend config.js with runtime flags";
+      after = [ "network.target" ];
+      before = [ "nginx.service" ];
+      wantedBy = [ "multi-user.target" ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "penpot";
+        Group = "penpot";
+      };
+
+      script = ''
+        set -eu
+        rm -rf /var/lib/penpot/frontend
+        mkdir -p /var/lib/penpot/frontend
+        cp -r ${pkgs.penpot-frontend}/share/penpot/frontend/. /var/lib/penpot/frontend/
+        chmod -R u+w /var/lib/penpot/frontend
+
+        cat > /var/lib/penpot/frontend/js/config.js <<EOF
+        var penpotFlags = "${cfg.flags}";
+        var penpotPublicURI = "https://${cfg.domain}";
+        var penpotOIDCClientID = "pepnpot";
+        EOF
+      '';
+    };
+   
     users.users.penpot = {
       isSystemUser = true;
       group = "penpot";
@@ -181,6 +218,11 @@ in
     users.groups.penpot = { };
 
     # 4. Expose the static Frontend + API routing strictly through Nginx!
+    systemd.services.nginx = {
+      after = [ "penpot-frontend-config.service" ];
+      requires = [ "penpot-frontend-config.service" ];
+    };
+
     services.nginx = {
       enable = true;
       virtualHosts."${cfg.domain}" = {
@@ -189,7 +231,7 @@ in
         enableACME = true;
 
         locations."/" = {
-          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
+          root = "/var/lib/penpot/frontend";
           tryFiles = "$uri /index.html$is_args$args /index.html =404";
           extraConfig = ''
             add_header X-Frame-Options SAMEORIGIN always;
@@ -198,7 +240,7 @@ in
         };
 
         locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
-          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
+          root = "/var/lib/penpot/frontend";
           extraConfig = ''
             add_header Cache-Control "public, max-age=604800" always; # 7 days
           '';
