@@ -173,15 +173,14 @@ in
       environment = {
         PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
-        PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
-        PENPOT_SECRET_KEY = "rg6QxX2idEZVymHr053OeBiLXGADxU8EbxuA2GPe1znI4YY4883su8oz49vqo9VKI0BsgunfTE-4Yt3ByH0__w";
+        PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort
       };
 
       serviceConfig = {
         ExecStart = ''
           ${pkgs.penpot-exporter}/bin/penpot-exporter
         '';
-        # EnvironmentFile = [ cfg.secretKeyFileEX ];
+        EnvironmentFile = [ cfg.secretKeyFileEX ];
         User = "penpot";
         Group = "penpot";
         Restart = "always";
