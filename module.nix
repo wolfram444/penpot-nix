@@ -173,7 +173,7 @@ in
       environment = {
         PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
-        PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort
+        PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
       };
 
       serviceConfig = {
