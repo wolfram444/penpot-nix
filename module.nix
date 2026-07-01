@@ -52,6 +52,15 @@ in
       '';
     };
 
+    secretKeyFileEX = mkOption {
+      type = types.path;
+      description = ''
+        Path to a securely provisioned file containing Penpot's PENPOT_SECRET_KEY.
+        It serves as a master key from which other keys for subsystems are derived.
+        Recommended to use a 512-bit base64 encoded string.
+      '';
+    };
+
     db = {
       enablePostgres = mkOption {
         type = types.bool;
@@ -109,7 +118,7 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
+        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration  ";
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
@@ -159,13 +168,14 @@ in
         PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
         PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
+        # PENPOT_SECRET_KEY = "rg6QxX2idEZVymHr053OeBiLXGADxU8EbxuA2GPe1znI4YY4883su8oz49vqo9VKI0BsgunfTE-4Yt3ByH0__w";
       };
 
       serviceConfig = {
         ExecStart = ''
           ${pkgs.penpot-exporter}/bin/penpot-exporter
         '';
-        EnvironmentFile = [ cfg.secretKeyFile ];
+        EnvironmentFile = [ cfg.secretKeyFileEX ];
         User = "penpot";
         Group = "penpot";
         Restart = "always";
