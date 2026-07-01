@@ -52,7 +52,13 @@ in
       '';
     };
 
-    
+    secretKeyFileEX = mkOption {
+      type = types.path;
+      description = ''
+        Path to a securely provisioned file containing Penpot's PENPOT_SECRET_KEY for penpot_exporter.
+      '';
+    };
+
     flags = mkOption {
       type = types.str;
       default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
@@ -117,7 +123,7 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        
+
         PENPOT_FLAGS = cfg.flags;
 
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
@@ -174,14 +180,13 @@ in
         ExecStart = ''
           ${pkgs.penpot-exporter}/bin/penpot-exporter
         '';
-        EnvironmentFile = [ cfg.secretKeyFile ];
+        EnvironmentFile = [ cfg.secretKeyFileEX ];
         User = "penpot";
         Group = "penpot";
         Restart = "always";
       };
     };
 
-   
     systemd.services.penpot-frontend-config = {
       description = "Generate Penpot frontend config.js with runtime flags";
       after = [ "network.target" ];
@@ -209,7 +214,7 @@ in
         EOF
       '';
     };
-   
+
     users.users.penpot = {
       isSystemUser = true;
       group = "penpot";
