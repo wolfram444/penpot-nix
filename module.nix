@@ -144,7 +144,7 @@ in
 
         # Auth
         PENPOT_OIDC_CLIENT_ID = "pepnpot";
-        PENPOT_OIDC_CLIENT_SECRET = "he8SbNfmnfLNnOY5vNDp1qLXqieSReNe";
+        PENPOT_OIDC_CLIENT_SECRET = "fs4OIMGPhtWAbt5iwvbIVLCbvtirVs5m";
         PENPOT_OIDC_BASE_URI = "https://auth.funksiyachi.uz/realms/TestOpensearch/";
       };
 
