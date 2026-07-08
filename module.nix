@@ -61,7 +61,7 @@ in
 
     flags = mkOption {
       type = types.str;
-      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies  ";
       description = ''
         PENPOT_FLAGS,
       '';
