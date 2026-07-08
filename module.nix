@@ -174,7 +174,6 @@ in
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
         PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
-        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
         NODE_EXTRA_CA_CERTS = "/etc/ssl/certs/ca-certificates.crt";
 
