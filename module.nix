@@ -9,6 +9,40 @@ with lib;
 
 let
   cfg = config.services.penpot;
+  penpotLocations = {
+    "/" = {
+      root = "/var/lib/penpot/frontend";
+      tryFiles = "$uri /index.html$is_args$args /index.html =404";
+      extraConfig = ''
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header Cache-Control "no-store, no-cache, max-age=0" always;
+      '';
+    };
+    "~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
+      root = "/var/lib/penpot/frontend";
+      extraConfig = ''
+        add_header Cache-Control "public, max-age=604800" always;
+      '';
+    };
+    "/api" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
+      extraConfig = "proxy_buffering off;";
+    };
+    "/ws/notifications" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
+      proxyWebsockets = true;
+    };
+    "/assets" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
+    };
+    "/internal/assets/" = {
+      alias = "/var/lib/penpot/assets/";
+      extraConfig = "internal;";
+    };
+    "/api/export" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+    };
+  };
 in
 {
   options.services.penpot = {
@@ -61,7 +95,7 @@ in
 
     flags = mkOption {
       type = types.str;
-      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies ";
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
       description = ''
         PENPOT_FLAGS,
       '';
@@ -126,7 +160,7 @@ in
 
         PENPOT_FLAGS = cfg.flags;
 
-        PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
+        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
         PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
@@ -231,61 +265,78 @@ in
       requires = [ "penpot-frontend-config.service" ];
     };
 
-    services.nginx = {
-      enable = true;
-      virtualHosts."${cfg.domain}" = {
-
-        listen = [
-          {
-            addr = "0.0.0.0";
-            port = cfg.port;
-          }
-        ];
-
-        # forceSSL = true;
-        # enableACME = true;
-
-        locations."/" = {
-          root = "/var/lib/penpot/frontend";
-          tryFiles = "$uri /index.html$is_args$args /index.html =404";
-          extraConfig = ''
-            add_header X-Frame-Options SAMEORIGIN always;
-            add_header Cache-Control "no-store, no-cache, max-age=0" always;
-          '';
-        };
-
-        locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
-          root = "/var/lib/penpot/frontend";
-          extraConfig = ''
-            add_header Cache-Control "public, max-age=604800" always; # 7 days
-          '';
-        };
-
-        # Proxies
-        locations."/api" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
-          extraConfig = "proxy_buffering off;";
-        };
-
-        locations."/ws/notifications" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
-          proxyWebsockets = true;
-        };
-
-        locations."/assets" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
-        };
-
-        locations."/internal/assets/" = {
-          alias = "/var/lib/penpot/assets/";
-          extraConfig = "internal;";
-        };
-
-        locations."/api/export" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
-        };
-      };
+    services.nginx.virtualHosts."${cfg.domain}" = {
+      forceSSL = true;
+      enableACME = true;
+      locations = penpotLocations;
     };
+
+    services.nginx.virtualHosts."penpot-local" = {
+      listen = [
+        {
+          addr = "127.0.0.1";
+          port = cfg.port;
+        }
+      ];
+      # или addr = "0.0.0.0", если нужен доступ извне без SSL — но это небезопасно
+      locations = penpotLocations;
+    };
+
+    # services.nginx = {
+    #   enable = true;
+    #   virtualHosts."${cfg.domain}" = {
+
+    #     listen = [
+    #       {
+    #         addr = "0.0.0.0";
+    #         port = cfg.port;
+    #       }
+    #     ];
+
+    #     forceSSL = true;
+    #     enableACME = true;
+
+    #     locations."/" = {
+    #       root = "/var/lib/penpot/frontend";
+    #       tryFiles = "$uri /index.html$is_args$args /index.html =404";
+    #       extraConfig = ''
+    #         add_header X-Frame-Options SAMEORIGIN always;
+    #         add_header Cache-Control "no-store, no-cache, max-age=0" always;
+    #       '';
+    #     };
+
+    #     locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
+    #       root = "/var/lib/penpot/frontend";
+    #       extraConfig = ''
+    #         add_header Cache-Control "public, max-age=604800" always; # 7 days
+    #       '';
+    #     };
+
+    #     # Proxies
+    #     locations."/api" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
+    #       extraConfig = "proxy_buffering off;";
+    #     };
+
+    #     locations."/ws/notifications" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
+    #       proxyWebsockets = true;
+    #     };
+
+    #     locations."/assets" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
+    #     };
+
+    #     locations."/internal/assets/" = {
+    #       alias = "/var/lib/penpot/assets/";
+    #       extraConfig = "internal;";
+    #     };
+
+    #     locations."/api/export" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+    #     };
+    #   };
+    # };
 
   };
 }
