@@ -9,6 +9,51 @@ with lib;
 
 let
   cfg = config.services.penpot;
+  penpotLocations = {
+    "/" = {
+      root = "/var/lib/penpot/frontend";
+      tryFiles = "$uri /index.html$is_args$args /index.html =404";
+      extraConfig = ''
+        add_header X-Frame-Options SAMEORIGIN always;
+        add_header Cache-Control "no-store, no-cache, max-age=0" always;
+      '';
+    };
+    "~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
+      root = "/var/lib/penpot/frontend";
+      extraConfig = ''
+        add_header Cache-Control "public, max-age=604800" always;
+      '';
+    };
+    "/api" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
+      extraConfig = ''
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+      '';
+
+    };
+    "/ws/notifications" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
+      proxyWebsockets = true;
+    };
+    "/assets" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
+    };
+    "/internal/assets/" = {
+      alias = "/var/lib/penpot/assets/";
+      extraConfig = "internal;";
+    };
+    "/api/export" = {
+      proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+      extraConfig = ''
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+      '';
+    };
+  };
 in
 {
   options.services.penpot = {
@@ -27,7 +72,7 @@ in
 
     openFirewall = mkOption {
       type = types.bool;
-      default = false;
+      default = true;
       description = "Open ports in the firewall for the Nginx proxy.";
     };
 
@@ -55,9 +100,15 @@ in
     secretKeyFileEX = mkOption {
       type = types.path;
       description = ''
-        Path to a securely provisioned file containing Penpot's PENPOT_SECRET_KEY.
-        It serves as a master key from which other keys for subsystems are derived.
-        Recommended to use a 512-bit base64 encoded string.
+        Path to a securely provisioned file containing Penpot's PENPOT_SECRET_KEY for penpot_exporter.
+      '';
+    };
+
+    flags = mkOption {
+      type = types.str;
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies ";
+      description = ''
+        PENPOT_FLAGS,
       '';
     };
 
@@ -99,7 +150,6 @@ in
           ensureDBOwnership = true;
         }
       ];
-      # Note: We configure standard Postgres parameters out of the box.
     };
 
     services.redis.servers.penpot = mkIf cfg.db.enableRedis {
@@ -118,7 +168,9 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_FLAGS = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration  ";
+
+        PENPOT_FLAGS = cfg.flags;
+
         PENPOT_PUBLIC_URI = "https://${cfg.domain}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
@@ -134,12 +186,10 @@ in
 
         PENPOT_TELEMETRY_ENABLED = "true";
         PENPOT_TELEMETRY_REFERER = "nixos-module";
-
         # Auth
         PENPOT_OIDC_CLIENT_ID = "pepnpot";
-        PENPOT_OIDC_CLIENT_SECRET = "he8SbNfmnfLNnOY5vNDp1qLXqieSReNe";
+        PENPOT_OIDC_CLIENT_SECRET = "fs4OIMGPhtWAbt5iwvbIVLCbvtirVs5m";
         PENPOT_OIDC_BASE_URI = "https://auth.funksiyachi.uz/realms/TestOpensearch/";
-
       };
 
       serviceConfig = {
@@ -165,10 +215,9 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
+        PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
         PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
-        # PENPOT_SECRET_KEY = "rg6QxX2idEZVymHr053OeBiLXGADxU8EbxuA2GPe1znI4YY4883su8oz49vqo9VKI0BsgunfTE-4Yt3ByH0__w";
       };
 
       serviceConfig = {
@@ -182,7 +231,34 @@ in
       };
     };
 
-    # Automatically provision the unprivileged Penpot service user
+    systemd.services.penpot-frontend-config = {
+      description = "Generate Penpot frontend config.js with runtime flags";
+      after = [ "network.target" ];
+      before = [ "nginx.service" ];
+      wantedBy = [ "multi-user.target" ];
+
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        User = "penpot";
+        Group = "penpot";
+      };
+
+      script = ''
+        set -eu
+        rm -rf /var/lib/penpot/frontend
+        mkdir -p /var/lib/penpot/frontend
+        cp -r ${pkgs.penpot-frontend}/share/penpot/frontend/. /var/lib/penpot/frontend/
+        chmod -R u+w /var/lib/penpot/frontend
+
+        cat > /var/lib/penpot/frontend/js/config.js <<EOF
+        var penpotFlags = "${cfg.flags}";
+        var penpotPublicURI = "https://${cfg.domain}";
+        var penpotOIDCClientID = "pepnpot";
+        EOF
+      '';
+    };
+
     users.users.penpot = {
       isSystemUser = true;
       group = "penpot";
@@ -191,54 +267,83 @@ in
     users.groups.penpot = { };
 
     # 4. Expose the static Frontend + API routing strictly through Nginx!
-    services.nginx = {
-      enable = true;
-      virtualHosts."${cfg.domain}" = {
-
-        forceSSL = true;
-        enableACME = true;
-
-        locations."/" = {
-          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
-          tryFiles = "$uri /index.html$is_args$args /index.html =404";
-          extraConfig = ''
-            add_header X-Frame-Options SAMEORIGIN always;
-            add_header Cache-Control "no-store, no-cache, max-age=0" always;
-          '';
-        };
-
-        locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
-          root = "${pkgs.penpot-frontend}/share/penpot/frontend";
-          extraConfig = ''
-            add_header Cache-Control "public, max-age=604800" always; # 7 days
-          '';
-        };
-
-        # Proxies
-        locations."/api" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
-          extraConfig = "proxy_buffering off;";
-        };
-
-        locations."/ws/notifications" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
-          proxyWebsockets = true;
-        };
-
-        locations."/assets" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
-        };
-
-        locations."/internal/assets/" = {
-          alias = "/var/lib/penpot/assets/";
-          extraConfig = "internal;";
-        };
-
-        locations."/api/export" = {
-          proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
-        };
-      };
+    systemd.services.nginx = {
+      after = [ "penpot-frontend-config.service" ];
+      requires = [ "penpot-frontend-config.service" ];
     };
+
+    services.nginx.virtualHosts."${cfg.domain}" = {
+      forceSSL = true;
+      enableACME = true;
+      locations = penpotLocations;
+    };
+
+    services.nginx.virtualHosts."penpot-local" = {
+      listen = [
+        {
+          addr = "127.0.0.1";
+          port = cfg.port;
+        }
+      ];
+
+      locations = penpotLocations;
+    };
+
+    # services.nginx = {
+    #   enable = true;
+    #   virtualHosts."${cfg.domain}" = {
+
+    #     listen = [
+    #       {
+    #         addr = "0.0.0.0";
+    #         port = cfg.port;
+    #       }
+    #     ];
+
+    #     forceSSL = true;
+    #     enableACME = true;
+
+    #     locations."/" = {
+    #       root = "/var/lib/penpot/frontend";
+    #       tryFiles = "$uri /index.html$is_args$args /index.html =404";
+    #       extraConfig = ''
+    #         add_header X-Frame-Options SAMEORIGIN always;
+    #         add_header Cache-Control "no-store, no-cache, max-age=0" always;
+    #       '';
+    #     };
+
+    #     locations."~* \\.(js|css|jpg|png|svg|gif|ttf|woff|woff2|wasm|map)$" = {
+    #       root = "/var/lib/penpot/frontend";
+    #       extraConfig = ''
+    #         add_header Cache-Control "public, max-age=604800" always; # 7 days
+    #       '';
+    #     };
+
+    #     # Proxies
+    #     locations."/api" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
+    #       extraConfig = "proxy_buffering off;";
+    #     };
+
+    #     locations."/ws/notifications" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
+    #       proxyWebsockets = true;
+    #     };
+
+    #     locations."/assets" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/assets";
+    #     };
+
+    #     locations."/internal/assets/" = {
+    #       alias = "/var/lib/penpot/assets/";
+    #       extraConfig = "internal;";
+    #     };
+
+    #     locations."/api/export" = {
+    #       proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+    #     };
+    #   };
+    # };
 
   };
 }

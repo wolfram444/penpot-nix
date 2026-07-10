@@ -33,7 +33,7 @@
           penpot-src = pkgs.fetchFromGitHub {
             owner = "penpot";
             repo = "penpot";
-            rev = "2.15.3";
+            rev = "2.16.2";
             hash = "sha256-yMpM0nHfFHVeO6Nw2NC4UAmjj2D6MveiklKtNSz0b2A=";
           };
           # Override clojure to use Zulu JDK 25 (matching Penpot's Docker build)
