@@ -61,7 +61,7 @@ in
 
     flags = mkOption {
       type = types.str;
-      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies  ";
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
       description = ''
         PENPOT_FLAGS,
       '';
@@ -171,7 +171,7 @@ in
       wantedBy = [ "multi-user.target" ];
 
       environment = {
-        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
+        PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
         PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
         SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
