@@ -242,7 +242,7 @@ in
           }
         ];
 
-        forceSSL = true;
+        addSSL = true;
         enableACME = true;
 
         locations."/" = {
