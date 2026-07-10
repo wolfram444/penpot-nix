@@ -27,7 +27,7 @@ in
 
     openFirewall = mkOption {
       type = types.bool;
-      default = false;
+      default = true;
       description = "Open ports in the firewall for the Nginx proxy.";
     };
 
@@ -61,7 +61,7 @@ in
 
     flags = mkOption {
       type = types.str;
-      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies enable-login-with-oidc enable-oidc-registration disable-login-with-password disable-registration";
+      default = "disable-email-verification enable-smtp enable-prepl-server disable-secure-session-cookies ";
       description = ''
         PENPOT_FLAGS,
       '';
@@ -235,15 +235,15 @@ in
       enable = true;
       virtualHosts."${cfg.domain}" = {
 
-        # listen = [
-        #   {
-        #     addr = "0.0.0.0";
-        #     port = cfg.port;
-        #   }
-        # ];
+        listen = [
+          {
+            addr = "0.0.0.0";
+            port = cfg.port;
+          }
+        ];
 
-        forceSSL = true;
-        enableACME = true;
+        # forceSSL = true;
+        # enableACME = true;
 
         locations."/" = {
           root = "/var/lib/penpot/frontend";
