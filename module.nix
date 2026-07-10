@@ -26,7 +26,13 @@ let
     };
     "/api" = {
       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/api";
-      extraConfig = "proxy_buffering off;";
+      extraConfig = ''
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+        proxy_buffering off;
+      '';
+
     };
     "/ws/notifications" = {
       proxyPass = "http://127.0.0.1:${toString cfg.backendPort}/ws/notifications";
@@ -41,6 +47,11 @@ let
     };
     "/api/export" = {
       proxyPass = "http://127.0.0.1:${toString cfg.exporterPort}";
+      extraConfig = ''
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+      '';
     };
   };
 in
