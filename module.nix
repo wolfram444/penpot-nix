@@ -186,8 +186,6 @@ in
 
         PENPOT_TELEMETRY_ENABLED = "true";
         PENPOT_TELEMETRY_REFERER = "nixos-module";
-        PENPOT_EXPORTER_RENDER_TIMEOUT = "30000";
-
         # Auth
         PENPOT_OIDC_CLIENT_ID = "pepnpot";
         PENPOT_OIDC_CLIENT_SECRET = "fs4OIMGPhtWAbt5iwvbIVLCbvtirVs5m";
@@ -220,10 +218,6 @@ in
         PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_REDIS_URI = cfg.db.redisUri;
         PENPOT_HTTP_SERVER_PORT = toString cfg.exporterPort;
-        SSL_CERT_FILE = "/etc/ssl/certs/ca-certificates.crt";
-        NODE_EXTRA_CA_CERTS = "/etc/ssl/certs/ca-certificates.crt";
-        PENPOT_EXPORTER_RENDER_TIMEOUT = "30000";
-
       };
 
       serviceConfig = {
