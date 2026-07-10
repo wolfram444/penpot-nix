@@ -126,7 +126,7 @@ in
 
         PENPOT_FLAGS = cfg.flags;
 
-        PENPOT_PUBLIC_URI = "https://${cfg.domain}";
+        PENPOT_PUBLIC_URI = "http://localhost:${toString cfg.port}";
         PENPOT_HTTP_SERVER_PORT = toString cfg.backendPort;
         PENPOT_HTTP_SERVER_MAX_BODY_SIZE = "31457280";
         PENPOT_HTTP_SERVER_MAX_MULTIPART_BODY_SIZE = "367001600";
