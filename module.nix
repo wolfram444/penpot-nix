@@ -242,9 +242,6 @@ in
           }
         ];
 
-        addSSL = true;
-        enableACME = true;
-
         locations."/" = {
           root = "/var/lib/penpot/frontend";
           tryFiles = "$uri /index.html$is_args$args /index.html =404";
