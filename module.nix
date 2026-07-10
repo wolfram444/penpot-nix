@@ -237,7 +237,7 @@ in
 
         listen = [
           {
-            addr = "127.0.0.1";
+            addr = "0.0.0.0";
             port = cfg.port;
           }
         ];
