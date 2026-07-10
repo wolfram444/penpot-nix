@@ -235,6 +235,13 @@ in
       enable = true;
       virtualHosts."${cfg.domain}" = {
 
+        listen = [
+          {
+            addr = "0.0.0.0";
+            port = cfg.port;
+          }
+        ];
+
         forceSSL = true;
         enableACME = true;
 
