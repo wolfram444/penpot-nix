@@ -278,7 +278,7 @@ in
           port = cfg.port;
         }
       ];
-      # или addr = "0.0.0.0", если нужен доступ извне без SSL — но это небезопасно
+
       locations = penpotLocations;
     };
 
